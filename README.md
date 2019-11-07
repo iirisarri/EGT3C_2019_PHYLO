@@ -1,4 +1,4 @@
-# PEB_Phylogenomics
+# \#EGT3C_2019 Phylogenomics
 
 
 This hands-on course will introduce you to the awesomeness of phylogenomics.
@@ -14,13 +14,13 @@ The phylogenomics pipeline can become very complex, many additional steps might 
 
 We will use a dataset [from this paper](https://academic.oup.com/sysbio/article/65/6/1057/2281640). The starting point is a subset of proteins obtained from genomes/transcriptomes of 23 species of vertebrates and our aim is to reconstruct the phylogeny of these species using concatenated and coalescent approaches. In practice, we are using a subset of the full genomes/transcriptomes of these species, only to speed up computations.
 
-Let's start by downloading the data from [this respository](https://github.com/iirisarri/PEB_Phylogenomics/blob/master/vertebrate_proteomes.tar.gz) and decompress it into your preferred location. 
+Let's start by downloading the data from [this respository](https://github.com/iirisarri/EGT3C_2019_PHYLO/blob/master/vertebrate_proteomes.tar.gz) and decompress it into your preferred location. 
 
 <details>
   <summary>Need help?</summary>
   
 ```
-wget https://github.com/iirisarri/PEB_Phylogenomics/blob/master/vertebrate_proteomes.tar.gz
+wget https://github.com/iirisarri/EGT3C_2019_PHYLO/blob/master/vertebrate_proteomes.tar.gz
 tar zxvf vertebrate_proteomes.tar.gz
 ```
 </details>
@@ -39,7 +39,7 @@ The first step is to identify orthologs among all the proteins. We will use [Ort
 orthofinder -os -M msa -f vertebrate_proteomes
 ```
 
-The list of single-copy orthologs will be in a file called `Orthogroups.csv`. This file contains lists of sequence names inferred to belong to the same orthogroups. The sequence files of these orthogroups can be found in `Orthologues_XXXXX/Sequences`. Each file corresponds to one orthogroup ("gene"), containing one sequence per species.
+The list of single-copy orthologs will be in a file called `Orthogroups.csv`. This file contains lists of sequence names inferred to belong to the same orthogroups. The sequence files of these orthogroups can be found in `Orthologues_XXXXX/Sequences/`. Each file corresponds to one orthogroup ("gene"), containing one sequence per species.
 
 Let's fix sequence names to get tidy files and trees! Also, having homogeneous names across ortholog groups is necessary for the concatenation step. You can see that headers have the following format: `SourceFile_Genus_species_GENE_XXXX`. Can you simplify this to e.g. `Genus_species` format?
 
@@ -47,7 +47,7 @@ Let's fix sequence names to get tidy files and trees! Also, having homogeneous n
   <summary>Need help?</summary>
   
 ```
-for f in *.fa; do awk -F"_" '/>/ {print $1"_"$NF};!/>/ {print $0}' $f > out; mv out $f ; done
+for f in *.fa; do awk -F"_" '/>/ {print $1};!/>/ {print $0}' $f > out; mv out $f ; done
 ```
 </details>
 
@@ -115,8 +115,8 @@ for f in *.g08; do fasta2phylip.pl $f > $f.phy; done
 To infer our phylogenomic tree we need to concatenate single-gene alignments. This can be done with tools such as [FASconCAT](https://github.com/PatrickKueck/FASconCAT-G), which will read in all `\*.fas` `\*.phy` or `\*.nex` files in the working directory and concatenate them (in random order). A faster solution is to use our own script. The provided `concat_fasta_partitions.pl` Perl script will read the files given in STDIN and will output (1) a concatenated alignment to STDOUT and (2) a  file called `partitionfile.part` containing the coordinates of the gene alignments.
 
 ```
-perl concat_fasta_partitions.pl *filtered.mafft.g08 > vert_56g_filtered_g08.fa
-mv partitionfile.part vert_56g_filtered_g08.part
+perl concat_fasta_partitions.pl *filtered.mafft.g08 > vert_20g_filtered_g08.fa
+mv partitionfile.part vert_20g_filtered_g08.part
 ```
 
 Yeah!! Our concatenated dataset is ready to rock!!
@@ -131,19 +131,19 @@ One of the most common approaches in phylogenomics is gene concatenation: the si
 We will use [IQTREE](http://www.iqtree.org/), an efficient and accurate software for maximum likelihood analysis. Another great alternative is [RAxML](https://github.com/stamatak/standard-RAxML). The most simple analysis is to treat the concatenated dataset as a single homogeneous entity. We need to provide the number of threads to use (`-nt 4`) input alignment (`-s`), tell IQTREE to select the best-fit evolutionary model with BIC (`-m TEST -merit BIC`) and ask for branch support measures such as non-parametric bootstrapping and approximate likelihood ratio test (`-bb 1000 -alrt 1000`):
 
 ```
-iqtree-omp -s vert_56g_filtered_g08.fa -m TEST -merit BIC -bb 1000 -alrt 1000 -nt 4 -pre unpartitioned
+iqtree-omp -s vert_20g_filtered_g08.fa -m TEST -merit BIC -bb 1000 -alrt 1000 -nt 4 -pre unpartitioned
 ```
 
 A more sophisticated approach would be to perform a partitioned maximum likelihood analysis, where different genes (or other data partitions) are allowed to have different evolutionary models. This should provide a better fit to the data but will increase the number of parameters too. To launch this analysis we need to provide a file containing the coordinates of the partitions (`-spp`) and we can ask IQTREE to select the best-fit models for each partition, in this case according to AICc (more suitable for shorter alignments).
 
 ```
-iqtree-omp -s vert_56g_filtered_g08.fa -spp vert_56g_filtered_g08.part -m TEST -merit AICc -bb 1000 -alrt 1000 -nt 4 -pre partitioned
+iqtree-omp -s vert_20g_filtered_g08.fa -spp vert_20g_filtered_g08.part -m TEST -merit AICc -bb 1000 -alrt 1000 -nt 4 -pre partitioned
 ```
 
 Alternatively, the heterogeneity of evolutionary patterns among alignment sites can be accounted for with a site-heterogeneous model, such as the C60 model coupled with the previously-selected best-fit model JTT:
 
 ```
-iqtree-omp -s vert_56g_filtered_g08.fa -m JTT+G+C60 -bb 1000 -alrt 1000 -nt 4 -pre mixture_model
+iqtree-omp -s vert_20g_filtered_g08.fa -m JTT+G+C60 -bb 1000 -alrt 1000 -nt 4 -pre mixture_model
 ```
 
 Congratulations!! If everything went well, you should get your maximum likelihood estimation of the vertebrate phylogeny (`.treefile`)! Looking into the file you will see a tree in parenthetical (newick) format. See below how to create a graphical representation of your tree.
