@@ -112,11 +112,15 @@ for f in *.g08; do fasta2phylip.pl $f > $f.phy; done
 ## Concatenate alignment
 
 
-To infer our phylogenomic tree we need to concatenate single-gene alignments. This can be done with tools such as [FASconCAT](https://github.com/PatrickKueck/FASconCAT-G), which will read in all `\*.fas` `\*.phy` or `\*.nex` files in the working directory and concatenate them (in random order). A faster solution is to use our own script. The provided `concat_fasta_partitions.pl` Perl script will read the files given in STDIN and will output (1) a concatenated alignment to STDOUT and (2) a  file called `partitionfile.part` containing the coordinates of the gene alignments.
+To infer our phylogenomic tree we need to concatenate single-gene alignments. This can be done with tools such as [FASconCAT](https://github.com/PatrickKueck/FASconCAT-G), which will read in all `\*.fas` `\*.phy` or `\*.nex` files in the working directory and concatenate them (in random order).
 
 ```
-perl concat_fasta_partitions.pl *filtered.mafft.g08 > vert_20g_filtered_g08.fa
-mv partitionfile.part vert_20g_filtered_g08.part
+mkdir concatenation
+mv *phy concatenation
+cd concatenation
+perl FASconCAT-G_v1.04.pl -l -s -p
+mv FcC_supermatrix.fas vert_20g_filtered_g08.fa
+mv FcC_supermatrix_partition.txt vert_20g_filtered_g08.part
 ```
 
 Yeah!! Our concatenated dataset is ready to rock!!
@@ -131,19 +135,19 @@ One of the most common approaches in phylogenomics is gene concatenation: the si
 We will use [IQTREE](http://www.iqtree.org/), an efficient and accurate software for maximum likelihood analysis. Another great alternative is [RAxML](https://github.com/stamatak/standard-RAxML). The most simple analysis is to treat the concatenated dataset as a single homogeneous entity. We need to provide the number of threads to use (`-nt 4`) input alignment (`-s`), tell IQTREE to select the best-fit evolutionary model with BIC (`-m TEST -merit BIC`) and ask for branch support measures such as non-parametric bootstrapping and approximate likelihood ratio test (`-bb 1000 -alrt 1000`):
 
 ```
-iqtree-omp -s vert_20g_filtered_g08.fa -m TEST -merit BIC -bb 1000 -alrt 1000 -nt 4 -pre unpartitioned
+iqtree -s vert_20g_filtered_g08.fa -m TEST -merit BIC -bb 1000 -alrt 1000 -nt 4 -pre unpartitioned
 ```
 
 A more sophisticated approach would be to perform a partitioned maximum likelihood analysis, where different genes (or other data partitions) are allowed to have different evolutionary models. This should provide a better fit to the data but will increase the number of parameters too. To launch this analysis we need to provide a file containing the coordinates of the partitions (`-spp`) and we can ask IQTREE to select the best-fit models for each partition, in this case according to AICc (more suitable for shorter alignments).
 
 ```
-iqtree-omp -s vert_20g_filtered_g08.fa -spp vert_20g_filtered_g08.part -m TEST -merit AICc -bb 1000 -alrt 1000 -nt 4 -pre partitioned
+iqtree -s vert_20g_filtered_g08.fa -spp vert_20g_filtered_g08.part -m TEST -merit AICc -bb 1000 -alrt 1000 -nt 4 -pre partitioned
 ```
 
 Alternatively, the heterogeneity of evolutionary patterns among alignment sites can be accounted for with a site-heterogeneous model, such as the C60 model coupled with the previously-selected best-fit model JTT:
 
 ```
-iqtree-omp -s vert_20g_filtered_g08.fa -m JTT+G+C60 -bb 1000 -alrt 1000 -nt 4 -pre mixture_model
+iqtree -s vert_20g_filtered_g08.fa -m JTT+G+C60 -bb 1000 -alrt 1000 -nt 4 -pre mixture_model
 ```
 
 Congratulations!! If everything went well, you should get your maximum likelihood estimation of the vertebrate phylogeny (`.treefile`)! Looking into the file you will see a tree in parenthetical (newick) format. See below how to create a graphical representation of your tree.
